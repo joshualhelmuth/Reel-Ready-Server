@@ -99,9 +99,15 @@ async function ensureYtDlp() {
 async function getYouTubeTranscript(url, tmpDir, ytdlp) {
   console.log("Trying YouTube auto-captions...");
   const outBase = path.join(tmpDir, "transcript");
+  const proxyHost = process.env.PROXY_HOST || "p.webshare.io";
+  const proxyPort = process.env.PROXY_PORT || "80";
+  const proxyUser = process.env.PROXY_USERNAME || "";
+  const proxyPass = process.env.PROXY_PASSWORD || "";
+  const proxyUrl = proxyUser ? `http://${proxyUser}:${proxyPass}@${proxyHost}:${proxyPort}` : "";
+  const proxyFlag = proxyUrl ? `--proxy "${proxyUrl}"` : "";
   try {
     await shell(
-      '"' + ytdlp + '" --skip-download --write-auto-subs --sub-lang en --sub-format vtt --output "' + outBase + '" "' + url + '"',
+      '"' + ytdlp + '" --skip-download --write-auto-subs --sub-lang en --sub-format vtt ' + proxyFlag + ' --output "' + outBase + '" "' + url + '"',
       60000
     );
     const files = fs.readdirSync(tmpDir).filter(f => f.endsWith(".vtt"));
@@ -120,8 +126,17 @@ async function getYouTubeTranscript(url, tmpDir, ytdlp) {
 
 async function downloadVideo(url, outputPath, ytdlp) {
   console.log("Downloading video...");
+  const proxyHost = process.env.PROXY_HOST || "p.webshare.io";
+  const proxyPort = process.env.PROXY_PORT || "80";
+  const proxyUser = process.env.PROXY_USERNAME || "";
+  const proxyPass = process.env.PROXY_PASSWORD || "";
+  const proxyUrl = proxyUser
+    ? `http://${proxyUser}:${proxyPass}@${proxyHost}:${proxyPort}`
+    : "";
+  const proxyFlag = proxyUrl ? `--proxy "${proxyUrl}"` : "";
+  console.log("Using proxy:", proxyUrl ? `${proxyHost}:${proxyPort}` : "none");
   await shell(
-    '"' + ytdlp + '" -f "worst[height>=360]/best[height<=480]/best" --no-playlist --max-filesize 100m -o "' + outputPath + '" "' + url + '"',
+    '"' + ytdlp + '" -f "worst[height>=360]/best[height<=480]/best" --no-playlist --max-filesize 100m ' + proxyFlag + ' -o "' + outputPath + '" "' + url + '"',
     180000
   );
   if (!fs.existsSync(outputPath)) throw new Error("Video file not found after download");
