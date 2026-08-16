@@ -1,11 +1,11 @@
 {
   "name": "reel-ready-server",
   "version": "1.0.0",
-  "description": "Reel Ready backend — video download, frame extraction, Whisper transcription, Claude Vision analysis",
+  "description": "Reel Ready backend",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "build": "pip install yt-dlp"
+    "build": "npm install && pip install -q yt-dlp --break-system-packages"
   },
   "dependencies": {
     "express": "^4.18.2",
