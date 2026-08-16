@@ -65,7 +65,7 @@ async function ensureYtDlp() {
     console.log("yt-dlp:", v);
   } catch {
     console.log("Installing yt-dlp...");
-    await shell("pip install -q yt-dlp", 90000);
+    await shell("pip install -q yt-dlp --break-system-packages", 90000);
   }
 }
 
