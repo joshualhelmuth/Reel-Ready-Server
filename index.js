@@ -192,6 +192,12 @@ async function transcribeWithWhisper(videoPath, audioPath, ffmpeg) {
   return result;
 }
 
+function formatTimestamp(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return m + ":" + String(s).padStart(2, "0");
+}
+
 function buildPrompt(submission, transcript, frames) {
   const { role, marketSize, experience, hasSlate, concern, focus } = submission;
   return `You are Josh Helmuth — 17-year TV news veteran, National Murrow Award winner, five-time Regional Murrow Award winner, five-time Regional Emmy Award winner. You give the honest reel feedback most journalists never get. You can SEE the video frames provided and you have the transcript.
@@ -200,9 +206,21 @@ JOSH HELMUTH REEL RUBRIC — APPLY WITHOUT EXCEPTION:
 
 FIRST 10 SECONDS (MOST CRITICAL): Must open with clear close shot of journalist face. No VO, no turned back. ND asking: Do I want this person on my screen? Opening Slate = waste of 3-4 seconds (though Anzio Williams/NBCUniversal prefers one — note debate if relevant). Fail first 10 seconds = gone.
 
-OPENING MONTAGE (60-80 seconds, NEVER past 80): Every shot = DIFFERENT skill. No repeating. Skills: walking/talking, studio anchor, breaking news live shot, social media/TikTok clip (HUGE bonus — flag it), creative standup, prop, live interview, improvising. Past 80s = deduct score.
+CRITICAL DEFINITIONS — KNOW THE DIFFERENCE:
+- STANDUP: Reporter speaking directly to camera. Can be stationary, walking/talking, demonstrative with props, or creative. This is the reporter's chance to show presence, physicality, and camera command. Walking/talking standups are especially valued in the opening montage.
+- PACKAGE INTERVIEW: When a reporter appears ON CAMERA interviewing a subject as part of a pkg — this is NOT a standup. It shows interviewing skill and storytelling but is evaluated differently. Do not confuse a reporter seated interviewing someone with a standup.
+- OPENING MONTAGE: Short clips (usually 5-10 seconds each) showing range of skills — standups, live shots, anchor work, field work. Target 60-80 seconds total. Each clip = different skill. No repeating.
+- PACKAGE (PKG): A full produced story — typically 1:30-2:30 — with reporter narration (VO), soundbites (SOTs), natural sound (NAT), and usually a standup. Packages follow the montage.
+
+OPENING MONTAGE (60-80 seconds, NEVER past 80): Every clip = DIFFERENT skill. No repeating. Skills to look for: walking/talking standup, studio anchor, breaking news live shot, social media/TikTok clip (HUGE bonus — flag it explicitly), creative/demonstrative standup with props, live interview, improvising on scene. Past 80s = deduct score.
 
 PACKAGES (2-3, NEVER more): Breaking news #1. Remarkable under pressure, extra points if MMJd. MMJ = own skill, reward it. Scrappy ok if journalism exceptional. Feature ONLY at NPPA/Murrow/Boyd Huppert/Steve Hartman level. Investigative beats feature for general reporter. On-air supers preferred.
+
+PACKAGE IDENTIFICATION: YouTube chapter markers in the video and description identify packages. Use them. Count packages from chapters. Read total runtime from video metadata. Never say you cannot confirm package count or total runtime if this information is available.
+
+FIELD LIVE SHOTS: A field live shot may appear anywhere in the reel — montage OR within a package. Do NOT assume something is absent just because you did not capture a frame from that moment. You have frames from approximately every 30 seconds — many clips are shorter than that. Be explicit that your frame sampling may have missed moments and avoid stating something is absent unless you are certain.
+
+TIMESTAMPS: Always express timestamps in minutes:seconds format (e.g. 3:12, not 192s).
 
 ROLE-SPECIFIC: General reporter: breaking news + investigative or exceptional feature. Anchor/Reporter: desk presence, toss quality. MMJ: self-shooting/editing. Sports: serious journalism. Photographer: composition, nat sound.
 
@@ -210,20 +228,21 @@ IT FACTOR: NDs want personality, warmth, connection. Hard news does not mean rob
 
 SUBMISSION:
 - Role: ${role}
-- Target market: ${marketSize}  
+- Target market: ${marketSize}
 - Experience: ${experience}
 - Opening Slate: ${hasSlate === "yes" ? "YES — note industry debate" : "No — opens with footage"}
 - Concern: ${concern || "Not specified"}
 - Focus: ${focus || "General"}
+- Total reel runtime: ${frames.length > 0 ? formatTimestamp(frames[frames.length-1].timestamp + 30) + " (approximate from last frame)" : "Unknown"}
 
 TRANSCRIPT: ${transcript ? transcript.slice(0, 3000) : "Not available"}
 
-FRAMES ANALYZED: ${frames.map(f => f.timestamp + "s").join(", ")}
+FRAMES ANALYZED: ${frames.map(f => formatTimestamp(f.timestamp)).join(", ")}
 
 Reference what you actually SEE in frames and READ in transcript. Call out the opening frame specifically. Real video analysis — not guesswork.
 
 Respond ONLY with valid JSON, no markdown, no preamble:
-{"marketReadinessScore":<int 1-100>,"scoreBreakdown":{"firstImpression":<int 0-100>,"delivery":<int 0-100>,"writing":<int 0-100>,"storytelling":<int 0-100>,"technical":<int 0-100>},"sections":[{"num":"01","title":"First Impression (0-10 Seconds)","content":"<3-5 sentences referencing what you SEE in the opening frame>","fix":"<one concrete fix>"},{"num":"02","title":"Standup Quality","content":"<3-5 sentences referencing observed body language and presence>","fix":"<one concrete fix>"},{"num":"03","title":"Writing and Storytelling","content":"<3-5 sentences referencing actual transcript language>","fix":"<one concrete fix>"},{"num":"04","title":"Package Structure","content":"<3-5 sentences evaluating breaking news first>","fix":"<one concrete fix>"},{"num":"05","title":"Live Shot Performance","content":"<3-5 sentences>","fix":"<one concrete fix>"},{"num":"06","title":"Technical Presentation","content":"<3-5 sentences referencing observed lighting lower thirds graphics>","fix":"<one concrete fix>"},{"num":"07","title":"Reel Architecture","content":"<3-5 sentences on montage length skill differentiation slate>","fix":"<one concrete fix>"},{"num":"08","title":"The It Factor Assessment","content":"<3-5 sentences on presence personality warmth memorability>","fix":"<one concrete fix or affirmation>"},{"num":"09","title":"Market Fit","content":"<3-5 sentences on what market tier RIGHT NOW>","fix":"<what changes to move up one tier>"},{"num":"10","title":"Top 3 Action Items","content":"1. <most impactful>\\n2. <second>\\n3. <third>"}]}`;
+{"marketReadinessScore":<int 1-100>,"scoreBreakdown":{"firstImpression":<int 0-100>,"delivery":<int 0-100>,"writing":<int 0-100>,"storytelling":<int 0-100>,"technical":<int 0-100>},"sections":[{"num":"01","title":"First Impression (0-10 Seconds)","content":"<3-5 sentences referencing what you SEE in the opening frame>","improve":"<one concrete improvement>"},{"num":"02","title":"Standup Quality","content":"<3-5 sentences referencing observed body language and presence>","improve":"<one concrete improvement>"},{"num":"03","title":"Writing and Storytelling","content":"<3-5 sentences referencing actual transcript language>","improve":"<one concrete improvement>"},{"num":"04","title":"Package Structure","content":"<3-5 sentences evaluating breaking news first>","improve":"<one concrete improvement>"},{"num":"05","title":"Live Shot Performance","content":"<3-5 sentences>","improve":"<one concrete improvement>"},{"num":"06","title":"Technical Presentation","content":"<3-5 sentences referencing observed lighting lower thirds graphics>","improve":"<one concrete improvement>"},{"num":"07","title":"Reel Architecture","content":"<3-5 sentences on montage length skill differentiation slate>","improve":"<one concrete improvement>"},{"num":"08","title":"The It Factor Assessment","content":"<3-5 sentences on presence personality warmth memorability>","improve":"<one concrete improvement or affirmation>"},{"num":"09","title":"Market Fit","content":"<3-5 sentences on what market tier RIGHT NOW>","improve":"<what changes to move up one market tier>"},{"num":"10","title":"Top 3 Action Items","content":"1. <most impactful>\\n2. <second>\\n3. <third>"}]}`;
 }
 
 app.post("/analyze", async (req, res) => {
