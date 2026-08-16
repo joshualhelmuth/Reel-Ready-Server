@@ -59,22 +59,49 @@ function getFfprobePath() {
   return "ffprobe";
 }
 
-async function ensureYtDlp() {
-  try {
-    const v = await shell("yt-dlp --version", 10000);
-    console.log("yt-dlp:", v);
-  } catch {
-    console.log("Installing yt-dlp...");
-    await shell("pip install -q yt-dlp --break-system-packages", 90000);
+function getYtDlpCmd() {
+  const candidates = [
+    "yt-dlp",
+    "/usr/local/bin/yt-dlp",
+    "/usr/bin/yt-dlp",
+    (process.env.HOME || "/root") + "/.local/bin/yt-dlp",
+    "/root/.local/bin/yt-dlp"
+  ];
+  for (const c of candidates) {
+    try {
+      const r = require("child_process").execSync(c + " --version 2>/dev/null", { timeout: 5000 }).toString().trim();
+      if (r) { console.log("yt-dlp at:", c); return c; }
+    } catch {}
   }
+  return null;
 }
 
-async function getYouTubeTranscript(url, tmpDir) {
+async function ensureYtDlp() {
+  let cmd = getYtDlpCmd();
+  if (cmd) return cmd;
+  console.log("yt-dlp not found — installing via curl...");
+  try {
+    await shell("curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp", 60000);
+  } catch(e) {
+    console.log("curl install failed:", e.message);
+    try {
+      await shell("pip install -q yt-dlp --break-system-packages --user", 90000);
+    } catch(e2) {
+      await shell("pip3 install -q yt-dlp --break-system-packages --user", 90000);
+    }
+  }
+  cmd = getYtDlpCmd();
+  if (!cmd) throw new Error("Could not find or install yt-dlp");
+  console.log("yt-dlp ready at:", cmd);
+  return cmd;
+}
+
+async function getYouTubeTranscript(url, tmpDir, ytdlp) {
   console.log("Trying YouTube auto-captions...");
   const outBase = path.join(tmpDir, "transcript");
   try {
     await shell(
-      'yt-dlp --skip-download --write-auto-subs --sub-lang en --sub-format vtt --output "' + outBase + '" "' + url + '"',
+      '"' + ytdlp + '" --skip-download --write-auto-subs --sub-lang en --sub-format vtt --output "' + outBase + '" "' + url + '"',
       60000
     );
     const files = fs.readdirSync(tmpDir).filter(f => f.endsWith(".vtt"));
@@ -91,10 +118,10 @@ async function getYouTubeTranscript(url, tmpDir) {
   return null;
 }
 
-async function downloadVideo(url, outputPath) {
+async function downloadVideo(url, outputPath, ytdlp) {
   console.log("Downloading video...");
   await shell(
-    'yt-dlp -f "worst[height>=360]/best[height<=480]/best" --no-playlist --max-filesize 100m -o "' + outputPath + '" "' + url + '"',
+    '"' + ytdlp + '" -f "worst[height>=360]/best[height<=480]/best" --no-playlist --max-filesize 100m -o "' + outputPath + '" "' + url + '"',
     180000
   );
   if (!fs.existsSync(outputPath)) throw new Error("Video file not found after download");
@@ -200,11 +227,11 @@ app.post("/analyze", async (req, res) => {
     console.log("\n=== ANALYSIS START ===");
     console.log("URL:", submission.reelUrl);
 
-    await ensureYtDlp();
+    const ytdlp = await ensureYtDlp();
 
-    let transcript = await getYouTubeTranscript(submission.reelUrl, tmpDir);
+    let transcript = await getYouTubeTranscript(submission.reelUrl, tmpDir, ytdlp);
 
-    await downloadVideo(submission.reelUrl, videoPath);
+    await downloadVideo(submission.reelUrl, videoPath, ytdlp);
 
     const frames = await extractFrames(videoPath, framesDir, ffmpeg, ffprobe);
 
