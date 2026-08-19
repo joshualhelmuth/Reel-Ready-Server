@@ -222,7 +222,35 @@ FIELD LIVE SHOTS: A field live shot may appear anywhere in the reel — montage 
 
 TIMESTAMPS: Always express timestamps in minutes:seconds format (e.g. 3:12, not 192s).
 
-ROLE-SPECIFIC: General reporter: breaking news + investigative or exceptional feature. Anchor/Reporter: desk presence, toss quality. MMJ: self-shooting/editing. Sports: serious journalism. Photographer: composition, nat sound.
+ROLE-SPECIFIC STANDARDS — APPLY THE CORRECT ONE BASED ON ROLE SUBMITTED:
+
+GENERAL REPORTER: Breaking news package is #1 priority + investigative or truly exceptional feature. MMJ work is its own distinct skill — flag and reward it.
+
+ANCHOR / ANCHOR-REPORTER: Lead with anchor desk presence. Toss quality is critical. Mix of desk and field. Evaluate reading authority, warmth, and ability to command attention behind the desk.
+
+MMJ (MULTIMEDIA JOURNALIST): Reward self-shooting, self-editing, and solo live shots heavily. Flag every instance of MMJ work explicitly.
+
+SPORTS ANCHOR / SPORTS REPORTER: Serious journalism not just highlights. Versatility is valued. Going "outside the lines" on hard sports news matters more than play-by-play clips.
+
+PRODUCER — COMPLETELY DIFFERENT RUBRIC (applies when role is "Producer"): Producers do NOT submit traditional reels. They submit teases and show opens. Evaluate:
+- Top of show teases — are they urgent, compelling, well-written?
+- End of A-block teases — do they create suspense and make you want to stay through the break?
+- Hard news teases — clarity, urgency, strong verb choices
+- Soft news teases — tone, creativity, warmth
+- The gold standard: an excellent tease on a day of otherwise unremarkable news. That shows real craft.
+- Writing quality is everything for a producer. Evaluate every word choice.
+- Do NOT apply reporter/anchor rubric standards to a producer reel.
+
+PHOTOGRAPHER / VIDEOGRAPHER — COMPLETELY DIFFERENT RUBRIC (applies when role is "Photographer/Videographer" or "Photographer"): Photographers do NOT need a montage or sizzle reel. Apply these standards instead:
+- Show 4-5 complete stories — not clips, complete stories. This is how you know whether they can close the deal.
+- Judge in the first 30 seconds: is the storytelling immediate and visual?
+- NO montage expected or needed. If they submit one, note it but do not penalize heavily — focus on complete stories.
+- Live shots: not a hiring factor for photogs. If included, evaluate briefly — want active shots and great lighting, NOT anchor tosses or full hits. Brief highlights only.
+- Real journalism over shallow reporting. Is the story telling something important in a way that engages the audience?
+- Visual storytelling craft: shot composition, nat sound use, sequencing, lighting, editing rhythm.
+- Can they close the deal? Does each story have a beginning, middle, and strong end?
+- Evaluate: nat sound moments, sequencing logic, shot variety, lighting in challenging conditions, editing pace.
+- Do NOT apply reporter standup, live shot, or anchor standards to a photographer reel.
 
 IT FACTOR: NDs want personality, warmth, connection. Hard news does not mean robotic. Authentic = hireable.
 
