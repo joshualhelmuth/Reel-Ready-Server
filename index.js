@@ -136,7 +136,7 @@ async function downloadVideo(url, outputPath, ytdlp) {
   const proxyFlag = proxyUrl ? `--proxy "${proxyUrl}"` : "";
   console.log("Using proxy:", proxyUrl ? `${proxyHost}:${proxyPort}` : "none");
   await shell(
-    '"' + ytdlp + '" -f "worst[height>=360]/best[height<=480]/best" --no-playlist --max-filesize 100m --extractor-args "youtube:player_client=web,default" ' + proxyFlag + ' -o "' + outputPath + '" "' + url + '"',
+    '"' + ytdlp + '" -f "bestvideo[height<=480]+bestaudio/best[height<=480]/best" --no-playlist --max-filesize 150m --extractor-args "youtube:player_client=web,default" ' + proxyFlag + ' -o "' + outputPath + '" "' + url + '"',
     180000
   );
   if (!fs.existsSync(outputPath)) throw new Error("Video file not found after download");
