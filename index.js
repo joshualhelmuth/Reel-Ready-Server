@@ -192,7 +192,7 @@ async function getTranscript(url, tmpDir, ytdlp) {
 
 async function getVideoStreamUrl(url, ytdlp, proxyFlag) {
   console.log("Getting stream URL via yt-dlp (metadata only)...");
-  const cmd = '"' + ytdlp + '" -f "b[height<=480]/b/best" --get-url --no-playlist ' +
+  const cmd = '"' + ytdlp + '" --get-url --no-playlist ' +
     '--extractor-args "youtube:player_client=web,default" ' + proxyFlag + ' "' + url + '"';
   const streamUrl = await shell(cmd, 60000);
   if (!streamUrl || !streamUrl.startsWith("http")) throw new Error("Could not get stream URL");
