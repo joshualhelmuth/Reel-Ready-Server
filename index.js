@@ -233,7 +233,7 @@ async function downloadVideo(url, outputPath, ytdlp) {
   console.log("Fallback: downloading via proxy at lowest quality...");
   const proxyFlagFb = proxyUrl ? `--proxy "${proxyUrl}"` : "";
   await shell(
-    '"' + ytdlp + '" -f "best" --no-playlist --max-filesize 80m ' +
+    '"' + ytdlp + '" -f "b" --no-playlist --max-filesize 80m ' +
     '--extractor-args "youtube:player_client=web,default" ' + proxyFlagFb +
     ' -o "' + outputPath + '" "' + url + '"',
     180000
