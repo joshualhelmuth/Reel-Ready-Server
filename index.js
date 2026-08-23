@@ -229,8 +229,25 @@ async function downloadVideo(url, outputPath, ytdlp) {
     console.log("Optimized download failed:", e.message, "— falling back to full yt-dlp download");
   }
 
-  // Fallback: full download through proxy at lowest quality
-  console.log("Fallback: downloading via proxy at lowest quality...");
+  // Fallback: try without proxy first, then with proxy
+  console.log("Fallback: downloading directly without proxy...");
+  try {
+    await shell(
+      '"' + ytdlp + '" -f "b" --no-playlist --max-filesize 80m ' +
+      '--extractor-args "youtube:player_client=web,default" ' +
+      ' -o "' + outputPath + '" "' + url + '"',
+      180000
+    );
+    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 100000) {
+      console.log("Downloaded without proxy:", (fs.statSync(outputPath).size / 1024 / 1024).toFixed(1) + "MB");
+      return;
+    }
+  } catch(e2) {
+    console.log("Direct download also failed:", e2.message);
+  }
+
+  // Last resort: try with proxy
+  console.log("Last resort: trying with proxy...");
   const proxyFlagFb = proxyUrl ? `--proxy "${proxyUrl}"` : "";
   await shell(
     '"' + ytdlp + '" -f "b" --no-playlist --max-filesize 80m ' +
