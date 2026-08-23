@@ -59,6 +59,22 @@ function getFfprobePath() {
   return "ffprobe";
 }
 
+// Auto-update yt-dlp on startup to stay current with YouTube changes
+async function updateYtDlp() {
+  try {
+    console.log("Updating yt-dlp to latest version...");
+    await new Promise((resolve, reject) => {
+      exec("pip install -q --upgrade yt-dlp --break-system-packages --user 2>/dev/null || curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp 2>/dev/null || true",
+        { timeout: 60000 },
+        (err) => err ? reject(err) : resolve()
+      );
+    });
+    console.log("yt-dlp updated successfully");
+  } catch(e) {
+    console.log("yt-dlp update failed (non-fatal):", e.message);
+  }
+}
+
 function getYtDlpCmd() {
   const candidates = [
     "yt-dlp",
@@ -96,8 +112,58 @@ async function ensureYtDlp() {
   return cmd;
 }
 
-async function getYouTubeTranscript(url, tmpDir, ytdlp) {
-  console.log("Trying YouTube auto-captions...");
+async function getTranscript(url, tmpDir, ytdlp) {
+  // Try Supadata first (most reliable)
+  const supadata_key = process.env.SUPADATA_API_KEY;
+  if (supadata_key) {
+    try {
+      console.log("Trying Supadata for transcript...");
+      const resp = await axios.get("https://api.supadata.ai/v1/transcript", {
+        params: { url: url, lang: "en", text: true, mode: "auto" },
+        headers: { "x-api-key": supadata_key },
+        timeout: 60000
+      });
+
+      // Handle async job (202 response)
+      if (resp.status === 202 && resp.data.jobId) {
+        console.log("Supadata returned job ID, polling...", resp.data.jobId);
+        let attempts = 0;
+        while (attempts < 30) {
+          await new Promise(r => setTimeout(r, 2000));
+          const jobResp = await axios.get(`https://api.supadata.ai/v1/transcript/${resp.data.jobId}`, {
+            headers: { "x-api-key": supadata_key },
+            timeout: 10000
+          });
+          if (jobResp.data.status === "completed") {
+            const text = typeof jobResp.data.content === "string"
+              ? jobResp.data.content
+              : (jobResp.data.content || []).map(c => c.text || "").join(" ").trim();
+            if (text.length > 50) {
+              console.log("Supadata async transcript length:", text.length);
+              return text;
+            }
+            break;
+          }
+          if (jobResp.data.status === "failed") { break; }
+          attempts++;
+        }
+      }
+
+      // Handle immediate response (200)
+      if (resp.data && resp.data.content) {
+        const text = typeof resp.data.content === "string"
+          ? resp.data.content
+          : (resp.data.content || []).map(c => c.text || "").join(" ").trim();
+        if (text.length > 50) {
+          console.log("Supadata transcript length:", text.length);
+          return text;
+        }
+      }
+    } catch(e) { console.log("Supadata failed:", e.message, "— falling back to yt-dlp"); }
+  }
+
+  // Fallback: yt-dlp auto-captions
+  console.log("Trying yt-dlp auto-captions...");
   const outBase = path.join(tmpDir, "transcript");
   const proxyHost = process.env.PROXY_HOST || "p.webshare.io";
   const proxyPort = process.env.PROXY_PORT || "80";
@@ -117,29 +183,71 @@ async function getYouTubeTranscript(url, tmpDir, ytdlp) {
         .filter(l => l.trim() && !l.startsWith("WEBVTT") && !l.startsWith("NOTE") && !l.match(/^\d{2}:/) && !l.includes("-->") && !l.match(/^\d+$/))
         .map(l => l.replace(/<[^>]+>/g, "").trim())
         .filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
-      console.log("YouTube captions transcript length:", text.length);
+      console.log("yt-dlp captions transcript length:", text.length);
       return text || null;
     }
-  } catch(e) { console.log("YouTube captions failed:", e.message); }
+  } catch(e) { console.log("yt-dlp captions failed:", e.message); }
   return null;
 }
 
+async function getVideoStreamUrl(url, ytdlp, proxyFlag) {
+  console.log("Getting stream URL via yt-dlp (metadata only)...");
+  const cmd = '"' + ytdlp + '" -f "best[height<=360]/worst/best" --get-url --no-playlist ' +
+    '--extractor-args "youtube:player_client=web,default" ' + proxyFlag + ' "' + url + '"';
+  const streamUrl = await shell(cmd, 60000);
+  if (!streamUrl || !streamUrl.startsWith("http")) throw new Error("Could not get stream URL");
+  return streamUrl.split("\n")[0].trim();
+}
+
 async function downloadVideo(url, outputPath, ytdlp) {
-  console.log("Downloading video...");
+  console.log("Getting video for frame extraction (bandwidth-optimized)...");
   const proxyHost = process.env.PROXY_HOST || "p.webshare.io";
   const proxyPort = process.env.PROXY_PORT || "80";
   const proxyUser = process.env.PROXY_USERNAME || "";
   const proxyPass = process.env.PROXY_PASSWORD || "";
-  const proxyUrl = proxyUser
-    ? `http://${proxyUser}:${proxyPass}@${proxyHost}:${proxyPort}`
-    : "";
+  const proxyUrl = proxyUser ? `http://${proxyUser}:${proxyPass}@${proxyHost}:${proxyPort}` : "";
   const proxyFlag = proxyUrl ? `--proxy "${proxyUrl}"` : "";
-  console.log("Using proxy:", proxyUrl ? `${proxyHost}:${proxyPort}` : "none");
+
+  try {
+    // Step 1: Get stream URL through proxy — only metadata, minimal bandwidth
+    const streamUrl = await getVideoStreamUrl(url, ytdlp, proxyFlag);
+
+    // Step 2: Download only first 3 minutes directly from stream URL (no proxy needed)
+    // Cuts bandwidth by ~80% — we only need frames, not the full video
+    const ffmpeg = getFfmpegPath();
+    console.log("Downloading first 3 minutes directly (no proxy)...");
+    await shell(
+      '"' + ffmpeg + '" -i "' + streamUrl + '" -t 180 -c copy -avoid_negative_ts 1 "' + outputPath + '" -y 2>/dev/null',
+      120000
+    );
+
+    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 100000) {
+      console.log("Downloaded:", (fs.statSync(outputPath).size / 1024 / 1024).toFixed(1) + "MB (first 3 min only — bandwidth optimized)");
+      return;
+    }
+  } catch(e) {
+    console.log("Optimized download failed:", e.message, "— falling back to full yt-dlp download");
+  }
+
+  // Fallback: full download through proxy at lowest quality
+  console.log("Fallback: downloading via proxy at lowest quality...");
+  const proxyFlagFb = proxyUrl ? `--proxy "${proxyUrl}"` : "";
   await shell(
-    '"' + ytdlp + '" -f "bestvideo[height<=480]+bestaudio/best[height<=480]/best" --no-playlist --max-filesize 150m --extractor-args "youtube:player_client=web,default" ' + proxyFlag + ' -o "' + outputPath + '" "' + url + '"',
+    '"' + ytdlp + '" -f "worst[height>=240]/worst/best" --no-playlist --max-filesize 80m ' +
+    '--extractor-args "youtube:player_client=web,default" ' + proxyFlagFb +
+    ' -o "' + outputPath + '" "' + url + '"',
     180000
   );
-  if (!fs.existsSync(outputPath)) throw new Error("Video file not found after download");
+
+  if (!fs.existsSync(outputPath)) {
+    const dir = path.dirname(outputPath);
+    const files = fs.readdirSync(dir).filter(f => f.startsWith("reel") && !f.endsWith(".vtt"));
+    if (files.length > 0) {
+      fs.renameSync(path.join(dir, files[0]), outputPath);
+    } else {
+      throw new Error("Video file not found after download");
+    }
+  }
   console.log("Downloaded:", (fs.statSync(outputPath).size / 1024 / 1024).toFixed(1) + "MB");
 }
 
@@ -155,13 +263,30 @@ async function extractFrames(videoPath, framesDir, ffmpeg, ffprobe) {
     console.log("Duration:", dur, "seconds");
   } catch(e) { console.log("Duration detection failed, assuming 240s:", e.message); }
 
-  const timestamps = [2];
-  for (let i = 1; i <= 8; i++) {
-    const t = Math.round((dur / 9) * i);
-    if (t > 3 && t < dur - 2) timestamps.push(t);
+  // Dense sampling for first 90s (opening montage) — 1 frame every 4s
+  // Sparse sampling after 90s — 1 frame every 8s
+  const DENSE_END = Math.min(90, dur - 2);
+  const DENSE_INTERVAL = 4;
+  const SPARSE_INTERVAL = 8;
+
+  const timestamps = [2]; // Always grab frame at 2s for first impression
+
+  // Dense phase — every 4 seconds through first 90 seconds
+  for (let t = 6; t <= DENSE_END; t += DENSE_INTERVAL) {
+    if (t < dur - 1) timestamps.push(Math.round(t));
   }
 
-  const framePaths = [];
+  // Sparse phase — every 8 seconds after 90 seconds
+  for (let t = DENSE_END + SPARSE_INTERVAL; t < dur - 2; t += SPARSE_INTERVAL) {
+    timestamps.push(Math.round(t));
+  }
+
+  console.log("Planned timestamps:", timestamps.length, "frames");
+  console.log("Dense (0-90s):", timestamps.filter(t => t <= 90).length, "frames");
+  console.log("Sparse (90s+):", timestamps.filter(t => t > 90).length, "frames");
+
+  // Extract all frames
+  const allFrames = [];
   for (let i = 0; i < timestamps.length; i++) {
     const outPath = path.join(framesDir, "frame_" + String(i).padStart(3,"0") + ".jpg");
     try {
@@ -170,13 +295,27 @@ async function extractFrames(videoPath, framesDir, ffmpeg, ffprobe) {
         25000
       );
       if (fs.existsSync(outPath) && fs.statSync(outPath).size > 1000) {
-        framePaths.push({ path: outPath, timestamp: timestamps[i] });
-        console.log("Frame OK at " + timestamps[i] + "s");
+        allFrames.push({ path: outPath, timestamp: timestamps[i] });
       }
     } catch(e) { console.log("Frame failed at " + timestamps[i] + "s:", e.message); }
   }
-  console.log("Total frames:", framePaths.length);
-  return framePaths;
+  console.log("Total frames extracted:", allFrames.length);
+
+  // Smart selection for Claude Vision — max 20 frames
+  // Keep ALL sparse frames (packages section), thin out dense frames
+  if (allFrames.length <= 20) return allFrames;
+
+  const denseFrames = allFrames.filter(f => f.timestamp <= 90);
+  const sparseFrames = allFrames.filter(f => f.timestamp > 90);
+
+  // Keep all sparse frames, thin dense frames to fill remaining slots
+  const maxDense = 20 - sparseFrames.length;
+  const step = Math.ceil(denseFrames.length / maxDense);
+  const selectedDense = denseFrames.filter((_, i) => i % step === 0).slice(0, maxDense);
+
+  const selected = [...selectedDense, ...sparseFrames].sort((a,b) => a.timestamp - b.timestamp);
+  console.log("Selected for Claude Vision:", selected.length, "frames (" + selectedDense.length + " dense + " + sparseFrames.length + " sparse)");
+  return selected;
 }
 
 async function transcribeWithWhisper(videoPath, audioPath, ffmpeg) {
@@ -402,7 +541,7 @@ app.post("/analyze", async (req, res) => {
 
     const ytdlp = await ensureYtDlp();
 
-    let transcript = await getYouTubeTranscript(submission.reelUrl, tmpDir, ytdlp);
+    let transcript = await getTranscript(submission.reelUrl, tmpDir, ytdlp);
 
     await downloadVideo(submission.reelUrl, videoPath, ytdlp);
 
@@ -456,6 +595,9 @@ app.post("/analyze", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Update yt-dlp on startup (non-blocking)
+updateYtDlp().catch(e => console.log("Startup yt-dlp update failed:", e.message));
 
 app.listen(PORT, () => {
   const ffmpeg = getFfmpegPath();
