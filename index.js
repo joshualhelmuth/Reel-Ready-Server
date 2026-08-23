@@ -217,7 +217,7 @@ async function downloadVideo(url, outputPath, ytdlp) {
     const ffmpeg = getFfmpegPath();
     console.log("Downloading first 3 minutes directly (no proxy)...");
     await shell(
-      '"' + ffmpeg + '" -i "' + streamUrl + '" -t 180 -c copy -avoid_negative_ts 1 "' + outputPath + '" -y 2>/dev/null',
+      '"' + ffmpeg + '" -i "' + streamUrl + '" -t 180 -c:v libx264 -c:a aac -preset ultrafast -crf 28 "' + outputPath + '" -y 2>/dev/null',
       120000
     );
 
@@ -233,7 +233,7 @@ async function downloadVideo(url, outputPath, ytdlp) {
   console.log("Fallback: downloading via proxy at lowest quality...");
   const proxyFlagFb = proxyUrl ? `--proxy "${proxyUrl}"` : "";
   await shell(
-    '"' + ytdlp + '" -f "worst[height>=240]/worst/best" --no-playlist --max-filesize 80m ' +
+    '"' + ytdlp + '" -f "best" --no-playlist --max-filesize 80m ' +
     '--extractor-args "youtube:player_client=web,default" ' + proxyFlagFb +
     ' -o "' + outputPath + '" "' + url + '"',
     180000
